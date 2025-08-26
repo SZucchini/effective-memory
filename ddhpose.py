@@ -360,14 +360,29 @@ class DDHPose(nn.Module):
         targets_dir[:,:,1:] = dir
         targets_bone_length[:,:,1:] = bone_length
         
-        batch_results = [self.prepare_diffusion_bone_dir(targets_dir[i], targets_bone_length[i]) 
-                        for i in range(batch_size)]
+        batch_size = targets_dir.shape[0]
+        first_result = self.prepare_diffusion_bone_dir(targets_dir[0], targets_bone_length[0])
+        result_shapes = [r.shape for r in first_result]
         
-        diffused_dir = torch.stack([result[0] for result in batch_results])
-        noises_dir = torch.stack([result[1] for result in batch_results])
-        diffused_bone_length = torch.stack([result[2] for result in batch_results])
-        noises_bone_length = torch.stack([result[3] for result in batch_results])
-        ts = torch.stack([result[4] for result in batch_results])
+        diffused_dir = torch.empty((batch_size,) + result_shapes[0], device=targets.device, dtype=first_result[0].dtype)
+        noises_dir = torch.empty((batch_size,) + result_shapes[1], device=targets.device, dtype=first_result[1].dtype)
+        diffused_bone_length = torch.empty((batch_size,) + result_shapes[2], device=targets.device, dtype=first_result[2].dtype)
+        noises_bone_length = torch.empty((batch_size,) + result_shapes[3], device=targets.device, dtype=first_result[3].dtype)
+        ts = torch.empty((batch_size,) + result_shapes[4], device=targets.device, dtype=first_result[4].dtype)
+        
+        diffused_dir[0] = first_result[0]
+        noises_dir[0] = first_result[1]
+        diffused_bone_length[0] = first_result[2] 
+        noises_bone_length[0] = first_result[3]
+        ts[0] = first_result[4]
+        
+        for i in range(1, batch_size):
+            result = self.prepare_diffusion_bone_dir(targets_dir[i], targets_bone_length[i])
+            diffused_dir[i] = result[0]
+            noises_dir[i] = result[1]
+            diffused_bone_length[i] = result[2]
+            noises_bone_length[i] = result[3] 
+            ts[i] = result[4]
 
         return diffused_dir, noises_dir, diffused_bone_length, noises_bone_length, ts
 
